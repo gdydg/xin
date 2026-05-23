@@ -18,9 +18,6 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
   const m3uPath = `${outputDir}/live.m3u`;
   const txtPath = `${outputDir}/live.txt`;
 
-  const m3uPath = `${outputDir}/live.m3u`;
-  const txtPath = `${outputDir}/live.txt`;
-
   try {
     const mainMenuUrl = 'https://ssports.iqiyi.com/json/pc/matchData/match_716402760.json';
     const menuRes = await fetch(mainMenuUrl);
