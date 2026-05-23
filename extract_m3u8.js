@@ -12,7 +12,11 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
   logger.log(`[初始化] 获取北京时间今日日期: ${todayStr}`);
 
   let m3uContent = '#EXTM3U\n';
-  let txtContent = '';
+  const groupName = '新英直播';
+  let txtContent = `${groupName},#genre#\n`;
+
+  const m3uPath = `${outputDir}/live.m3u`;
+  const txtPath = `${outputDir}/live.txt`;
 
   const m3uPath = `${outputDir}/live.m3u`;
   const txtPath = `${outputDir}/live.txt`;
@@ -82,7 +86,7 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
       if (m3u8Urls.length > 0) {
         m3u8Urls.forEach((url, index) => {
           const channelName = `${match.title}-线路${index + 1}`;
-          m3uContent += `#EXTINF:-1 tvg-name="${channelName}" group-title="体育直播",${channelName}\n${url}\n`;
+          m3uContent += `#EXTINF:-1 tvg-name="${channelName}" group-title="${groupName}",${channelName}\n${url}\n`;
           txtContent += `${channelName},${url}\n`;
         });
       }
