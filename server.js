@@ -17,7 +17,7 @@ app.get('/healthz', (_, res) => {
   res.json({ ok: true, running, lastRunAt, lastResult });
 });
 
-app.post('/trigger', async (req, res) => {
+async function handleTrigger(req, res) {
   const token = req.header('x-trigger-token') || req.query.token;
   if (!TRIGGER_TOKEN || token !== TRIGGER_TOKEN) {
     return res.status(401).json({ ok: false, message: 'Unauthorized' });
@@ -38,7 +38,10 @@ app.post('/trigger', async (req, res) => {
   } finally {
     running = false;
   }
-});
+}
+
+app.post('/trigger', handleTrigger);
+app.get('/trigger', handleTrigger);
 
 app.get('/live.m3u', (_, res) => {
   res.sendFile(path.join(outputDir, 'live.m3u'));

@@ -25,8 +25,12 @@ docker push ghcr.io/<owner>/<repo>:latest
 使用任何外部 Cron（如 cron-job.org、GitHub Actions、UptimeRobot）请求：
 
 ```bash
+# POST 方式
 curl -X POST "https://<your-render-domain>/trigger" \
   -H "x-trigger-token: <TRIGGER_TOKEN>"
+
+# GET 方式（便于外部 cron / Cloudflare Worker 直接调用）
+curl "https://<your-render-domain>/trigger?token=<TRIGGER_TOKEN>"
 ```
 
 触发后会重新抓取并覆盖：
