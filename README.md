@@ -64,3 +64,16 @@ curl "https://<your-render-domain>/trigger?token=<TRIGGER_TOKEN>"
 
 - `live.m3u` 中所有频道统一使用 `group-title="新英直播"`。
 - `live.txt` 首行写入 `新英直播,#genre#`，其后为 `频道名,链接`。
+
+## 6) 直播场次判定逻辑
+
+为避免漏抓“正在直播”的场次，抓取逻辑会综合以下字段判断是否 live：
+
+- `matchBaseInfo.status === "1"`
+- `matchBaseInfo.statusV2 === "1"`
+- `matchBaseInfo.matchStatus === "1"`
+- `matchBaseInfo.statusDesc` 或 `timeDesc` 包含 `直播中`
+- `commonBaseInfo.type === "living"`
+- `jumpInfo.ssportsH5` 包含 `/live/`
+
+并按 `matchId` 去重，日志会输出本次识别到的全部直播 `matchId`。

@@ -34,17 +34,47 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
     const listRes = await fetch(todayMatchInfo.matchListUrl);
     const listData = await listRes.json();
 
-    const liveMatches = [];
-    if (listData.retData && listData.retData.match) {
+    const liveMatchesMap = new Map();
+    if (listData.retData && Array.isArray(listData.retData.match)) {
       listData.retData.match.forEach((m) => {
-        if (m.matchBaseInfo && m.matchBaseInfo.timeDesc === '直播中') {
-          liveMatches.push({
-            id: m.matchBaseInfo.matchId,
-            title: m.matchBaseInfo.title || `赛事-${m.matchBaseInfo.matchId}`
-          });
+        const matchBaseInfo = m.matchBaseInfo || {};
+        const commonBaseInfo = m.commonBaseInfo || {};
+        const jumpInfo = m.jumpInfo || {};
+
+        const status = String(matchBaseInfo.status || '').trim();
+        const statusV2 = String(matchBaseInfo.statusV2 || '').trim();
+        const matchStatus = String(matchBaseInfo.matchStatus || '').trim();
+        const statusDesc = String(matchBaseInfo.statusDesc || '').trim();
+        const timeDesc = String(matchBaseInfo.timeDesc || '').trim();
+        const commonType = String(commonBaseInfo.type || '').trim().toLowerCase();
+        const h5Url = String(jumpInfo.ssportsH5 || '').trim();
+
+        const isLive =
+          status === '1' ||
+          statusV2 === '1' ||
+          matchStatus === '1' ||
+          statusDesc.includes('直播中') ||
+          timeDesc.includes('直播中') ||
+          commonType === 'living' ||
+          h5Url.includes('/live/');
+
+        if (!isLive) {
+          return;
         }
+
+        const matchId = String(matchBaseInfo.matchId || commonBaseInfo.key || '').trim();
+        if (!matchId) {
+          return;
+        }
+
+        liveMatchesMap.set(matchId, {
+          id: matchId,
+          title: matchBaseInfo.title || `赛事-${matchId}`
+        });
       });
     }
+
+    const liveMatches = Array.from(liveMatchesMap.values());
 
     if (liveMatches.length === 0) {
       logger.log('[提示] 当前没有处于“直播中”状态的比赛。');
@@ -54,6 +84,7 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
     }
 
     logger.log(`[分析完毕] 共找到 ${liveMatches.length} 场正在直播的比赛。`);
+    logger.log(`[直播 matchId] ${liveMatches.map((m) => m.id).join(', ')}`);
 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
