@@ -1,0 +1,31 @@
+# .github/workflows/extract-stream.yml
+name: Extract M3U8 Stream URLs
+
+on:
+  workflow_dispatch: # 允许在 GitHub Actions 页面手动触发
+  # schedule:
+  #   - cron: '0 * * * *' # 可选：取消注释以启用定时执行（例如每小时执行一次）
+
+jobs:
+  run-extraction:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 初始化项目并安装 Playwright
+        run: |
+          npm init -y
+          npm install playwright
+
+      - name: 安装 Playwright 浏览器依赖 (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: 执行提取脚本
+        run: node extract_m3u8.js
