@@ -4,13 +4,16 @@ name: Extract M3U8 Stream URLs
 on:
   workflow_dispatch:
   # schedule:
-  #   - cron: '0 * * * *' 
+  #   - cron: '*/30 * * * *' # 可选：每30分钟自动更新一次
+
+# 赋予 Action 读写仓库的权限 (必须有这个才能 Push)
+permissions:
+  contents: write
 
 jobs:
   run-extraction:
     runs-on: ubuntu-latest
     
-    # 全局设置时区为北京时间
     env:
       TZ: Asia/Shanghai
 
@@ -24,21 +27,30 @@ jobs:
           node-version: '20'
 
       - name: 安装依赖
-        # 如果你仓库根目录已经有了 package.json，可以把 npm init -y 去掉
         run: |
           npm init -y
           npm install playwright
 
-      - name: 安装 Playwright 浏览器依赖 (Chromium)
+      - name: 安装 Playwright 浏览器
         run: npx playwright install --with-deps chromium
 
-      - name: 执行提取脚本并保存输出
-        # 这里将原本打印在控制台的内容同时输出到 result.log 文件中
-        run: node extract_m3u8.js | tee result.log
+      - name: 执行提取脚本生成 M3U 和 TXT
+        run: node extract_m3u8.js
 
-      # 可选：如果需要把提取结果作为构件下载，可以保留这一步
-      - name: 上传提取结果
-        uses: actions/upload-artifact@v4
-        with:
-          name: stream-urls
-          path: result.log
+      - name: 提交并推送到仓库
+        run: |
+          # 配置 Git 机器人信息
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 添加生成的文件
+          git add live.m3u live.txt
+          
+          # 检查是否有文件变动，如果有则提交并推送
+          if git diff --staged --quiet; then
+            echo "直播源未发生变化，无需提交。"
+          else
+            git commit -m "自动更新: 抓取最新直播流 [skip ci]"
+            git push
+            echo "最新直播源已推送至仓库根目录！"
+          fi
