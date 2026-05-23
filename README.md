@@ -58,3 +58,9 @@ curl "https://<your-render-domain>/trigger?token=<TRIGGER_TOKEN>"
 
 - `ghcr.io/<owner>/<repo>:latest`（默认分支）
 - `ghcr.io/<owner>/<repo>:<short-sha>`
+
+
+## 5) 输出分组
+
+- `live.m3u` 中所有频道统一使用 `group-title="新英直播"`。
+- `live.txt` 首行写入 `新英直播,#genre#`，其后为 `频道名,链接`。
