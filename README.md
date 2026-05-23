@@ -42,3 +42,15 @@ curl -X POST "https://<your-render-domain>/trigger" \
 健康检查：
 
 - `GET /healthz`
+
+## 4) GitHub Action 自动构建 GHCR
+
+已提供 `.github/workflows/build-image.yml`：
+
+- 手动触发（`workflow_dispatch`）
+- 推送到 `main` 且关键文件变更时自动触发
+
+镜像会推送到：
+
+- `ghcr.io/<owner>/<repo>:latest`（默认分支）
+- `ghcr.io/<owner>/<repo>:<short-sha>`
