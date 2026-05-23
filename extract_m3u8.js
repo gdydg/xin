@@ -1,6 +1,29 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 
+
+async function fetchJsonWithRetry(url, { retries = 3, timeoutMs = 10000, logger = console } = {}) {
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      if (attempt === retries) {
+        throw error;
+      }
+      logger.log(`[重试] 请求失败，${attempt}/${retries}，url=${url}，原因=${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function runExtraction({ outputDir = process.cwd(), logger = console } = {}) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
@@ -20,8 +43,7 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
 
   try {
     const mainMenuUrl = 'https://ssports.iqiyi.com/json/pc/matchData/match_716402760.json';
-    const menuRes = await fetch(mainMenuUrl);
-    const menuData = await menuRes.json();
+    const menuData = await fetchJsonWithRetry(mainMenuUrl, { retries: 3, timeoutMs: 10000, logger });
 
     const todayMatchInfo = menuData.retData.match.find((m) => m.day === todayStr);
     if (!todayMatchInfo || !todayMatchInfo.matchListUrl) {
@@ -31,34 +53,60 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
       return { updated: true, matches: 0 };
     }
 
-    const listRes = await fetch(todayMatchInfo.matchListUrl);
-    const listData = await listRes.json();
+    const listData = await fetchJsonWithRetry(todayMatchInfo.matchListUrl, { retries: 4, timeoutMs: 12000, logger });
 
-    const liveMatches = [];
-    if (listData.retData && listData.retData.match) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const lookbackSec = 6 * 60 * 60;
+    const windowStartSec = nowSec - lookbackSec;
+
+    const recentMatchesMap = new Map();
+    if (listData.retData && Array.isArray(listData.retData.match)) {
       listData.retData.match.forEach((m) => {
-        if (m.matchBaseInfo && m.matchBaseInfo.timeDesc === '直播中') {
-          liveMatches.push({
-            id: m.matchBaseInfo.matchId,
-            title: m.matchBaseInfo.title || `赛事-${m.matchBaseInfo.matchId}`
-          });
+        const matchBaseInfo = m.matchBaseInfo || {};
+        const commonBaseInfo = m.commonBaseInfo || {};
+
+        const startTimeStampRaw =
+          matchBaseInfo.matchRoomStartTimeStamp || matchBaseInfo.startTimeStamp || 0;
+        const startTimeStamp = Number(startTimeStampRaw);
+        if (!Number.isFinite(startTimeStamp) || startTimeStamp <= 0) {
+          return;
         }
+
+        const inWindow = startTimeStamp >= windowStartSec && startTimeStamp <= nowSec;
+        if (!inWindow) {
+          return;
+        }
+
+        const matchId = String(matchBaseInfo.matchId || commonBaseInfo.key || '').trim();
+        if (!matchId) {
+          return;
+        }
+
+        recentMatchesMap.set(matchId, {
+          id: matchId,
+          title: matchBaseInfo.title || `赛事-${matchId}`,
+          startTimeStamp
+        });
       });
     }
 
-    if (liveMatches.length === 0) {
-      logger.log('[提示] 当前没有处于“直播中”状态的比赛。');
+    const recentMatches = Array.from(recentMatchesMap.values()).sort((a, b) => b.startTimeStamp - a.startTimeStamp);
+
+    if (recentMatches.length === 0) {
+      logger.log('[提示] 当前没有“当前时间前 6 小时内开赛”的比赛。');
       fs.writeFileSync(m3uPath, m3uContent, 'utf-8');
       fs.writeFileSync(txtPath, txtContent, 'utf-8');
       return { updated: true, matches: 0 };
     }
 
-    logger.log(`[分析完毕] 共找到 ${liveMatches.length} 场正在直播的比赛。`);
+    logger.log(`[分析完毕] 共找到 ${recentMatches.length} 场“当前时间前 6 小时内开赛”的比赛。`);
+    logger.log(`[抓取窗口] ${windowStartSec} ~ ${nowSec} (unix seconds)`);
+    logger.log(`[matchId] ${recentMatches.map((m) => m.id).join(', ')}`);
 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
 
-    for (const match of liveMatches) {
+    for (const match of recentMatches) {
       const targetUrl = `https://shinaisports.com/live.html?matchId=${match.id}`;
       logger.log(`正在访问: ${targetUrl} (${match.title})`);
 
@@ -97,7 +145,7 @@ async function runExtraction({ outputDir = process.cwd(), logger = console } = {
     fs.writeFileSync(txtPath, txtContent, 'utf-8');
     logger.log('[完成] 成功生成 live.m3u 和 live.txt。');
 
-    return { updated: true, matches: liveMatches.length };
+    return { updated: true, matches: recentMatches.length };
   } catch (error) {
     logger.error('[错误] 异常:', error);
     throw error;

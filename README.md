@@ -64,3 +64,20 @@ curl "https://<your-render-domain>/trigger?token=<TRIGGER_TOKEN>"
 
 - `live.m3u` 中所有频道统一使用 `group-title="新英直播"`。
 - `live.txt` 首行写入 `新英直播,#genre#`，其后为 `频道名,链接`。
+
+## 6) matchId 抓取逻辑（已调整）
+
+为满足“减少漏抓”的需求，当前不再仅依赖直播状态字段，而是改为：
+
+- 读取赛事列表中每条比赛的 `matchRoomStartTimeStamp`（缺失时回退 `startTimeStamp`）
+- 仅保留 **当前时间往前 6 小时内** 的比赛：`now - 6h <= startTimeStamp <= now`
+- 按 `matchId` 去重后逐个发起页面请求并监听 m3u8
+
+这样即使接口中某些比赛状态字段短时不一致，也能在时间窗口内被抓到。
+
+- 拉取主菜单和当日比赛列表接口时增加重试与超时机制（避免你说的“第二个接口没加载完全”导致漏抓）。
+
+## 7) 输出分组说明
+
+- `live.m3u` 中频道分组仍固定为 `group-title="新英直播"`。
+- `live.txt` 首行仍固定为 `新英直播,#genre#`。
