@@ -1,0 +1,17 @@
+{
+  "name": "xin-stream-extractor",
+  "version": "1.0.0",
+  "description": "Render-deployable extractor with webhook trigger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "extract": "node extract_m3u8.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "playwright": "^1.60.0"
+  }
+}
